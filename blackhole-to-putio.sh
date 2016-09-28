@@ -76,12 +76,10 @@ if [[ -n ${retrieveList[0]} ]]; then
 		if [[ $dlType == FOLDER ]]; then
 			print_info "    - $dlId is a folder, zip needed"
 		else
-			print_info "    - Downloading $dlId"
-			pushd $BLACKHOLE &>/dev/null
-			mv $BLACKHOLE/${dlId}.transfer  $BLACKHOLE/${dlId}.downloading
-			aria2c -x 12 "http://api.put.io/v2/files/${dlId}/download?oauth_token=${PUTIO_TOKEN}"
-			mv  $BLACKHOLE/${dlId}.downloading  $BLACKHOLE/${dlId}.downloaded
-			popd &>/dev/null
+			print_info "    - Triggering download job for $dlId"
+			echo "URL=http://api.put.io/v2/files/${dlId}/download?oauth_token=${PUTIO_TOKEN}" > ${dlId}.dl
+			echo "DESTINATION_FOLDER=$BLACKHOLE" >> ${dlId}.dl
+			mv $BLACKHOLE/${dlId}.transfer $BLACKHOLE/${dlId}.downloaded
 		fi
 	done
 else
