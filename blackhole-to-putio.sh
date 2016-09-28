@@ -29,8 +29,8 @@ do
 	# Creating file for transfer tracking
 	touch $BLACKHOLE/${id}.transfer
 
-	# Marking torrent as processed
-	mv $file ${file}.$(date +"%Y-%m-%d_%H-%M").processed
+	# Deleting torrent file
+	rm -f $file
 
 	if [[ -n $SLACK_WEBHOOK_URL ]]; then
 		print_info "Sending notification to Slack"
@@ -86,7 +86,7 @@ if [[ -n ${retrieveList[0]} ]]; then
 				echo "DESTINATION_FOLDER=$BLACKHOLE" >> ${dlId}.dlzip
 				echo "PUTIO_TOKEN=$PUTIO_TOKEN" >> ${dlId}.dlzip
 
-				mv $BLACKHOLE/${dlId}.transfer $BLACKHOLE/${dlId}.zipped
+				rm -f $BLACKHOLE/${dlId}.transfer
 			else
 				print_error "        -> Zip creation failed on put.io"
 			fi
@@ -94,7 +94,7 @@ if [[ -n ${retrieveList[0]} ]]; then
 			print_info "    - Triggering download job for $dlId"
 			echo "URL=http://api.put.io/v2/files/${dlId}/download?oauth_token=${PUTIO_TOKEN}" > ${dlId}.dl
 			echo "DESTINATION_FOLDER=$BLACKHOLE" >> ${dlId}.dl
-			mv $BLACKHOLE/${dlId}.transfer $BLACKHOLE/${dlId}.downloaded
+			rm -f $BLACKHOLE/${dlId}.transfer
 		fi
 	done
 else
