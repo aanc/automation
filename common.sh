@@ -29,3 +29,18 @@ print_success() {
 	echo -e "${GREEN}   [OK] $msg${END}"
 	return 0
 }
+
+# External notification tools
+send_slack_notification() {
+	local msg="$1"
+
+	slackJson="{}"
+	[[ -n $SLACK_CHANNEL ]] && slackJson=$(jq '{"channel": "'$SLACK_CHANNEL'"}' <<< $slackJson)
+	[[ -n $SLACK_USERNAME ]] && slackJson=$(jq '. + {"username": "'$SLACK_USERNAME'"}' <<< $slackJson)
+	[[ -n $SLACK_ICON_URL ]] && slackJson=$(jq '. + {"icon_url": "'"$SLACK_ICON_URL"'"}' <<< $slackJson)
+	slackJson=$(jq '. + {"text": "'"$msg"'"}' <<< $slackJson)
+
+	notifResult=$(curl --silent -X POST --data-urlencode "payload=$slackJson" $SLACK_WEBHOOK_URL)
+	[[ $notifResult != ok ]] && print_error "Something went wront when sending Slack notification"
+
+}

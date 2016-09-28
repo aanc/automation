@@ -10,7 +10,9 @@ for file in $(find $BLACKHOLE -name "*.torrent")
 do
 	print_info "Processing ${BOLD}$(basename $file)${END}"
 
-	result=$(curl --silent -F file=@${file} "https://upload.put.io/v2/files/upload?oauth_token=${PUTIO_TOKEN}&parent_id=${FOLDER_ID}")
+	result=$(curl --silent -F file=@${file} \
+		"https://upload.put.io/v2/files/upload?oauth_token=${PUTIO_TOKEN}&parent_id=${FOLDER_ID}" \
+	)
 #	jq . <<< $result
 
 	status=$(jq -r .status <<< $result)
@@ -24,8 +26,9 @@ do
 	id=$(jq -r .transfer.id <<< $result)
 	print_success "Transfer added with id $id"
 
-	if [[ -z $NO_SLACK ]]; then
+	if [[ -n $SLACK_WEBHOOK_URL ]]; then
 		print_info "Sending notification to Slack"
+		send_slack_notification "Torrent $(basename ${file}) sent to Put.io"
 	fi
 	echo
 
