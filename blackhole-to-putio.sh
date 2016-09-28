@@ -77,7 +77,11 @@ if [[ -n ${retrieveList[0]} ]]; then
 			print_info "    - $dlId is a folder, zip needed"
 		else
 			print_info "    - Downloading $dlId"
-			aria2c "http://api.put.io/v2/files/${dlId}/download?oauth_token=${PUTIO_TOKEN}"
+			pushd $BLACKHOLE &>/dev/null
+			mv $BLACKHOLE/${dlId}.transfer  $BLACKHOLE/${dlId}.downloading
+			aria2c -x 12 "http://api.put.io/v2/files/${dlId}/download?oauth_token=${PUTIO_TOKEN}"
+			mv  $BLACKHOLE/${dlId}.downloading  $BLACKHOLE/${dlId}.downloaded
+			popd &>/dev/null
 		fi
 	done
 else
