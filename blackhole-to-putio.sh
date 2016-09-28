@@ -46,16 +46,17 @@ completedDownloadsJson=$(curl --silent "https://api.put.io/v2/files/list?oauth_t
 declare -a retrieveList
 oIFS=$IFS
 IFS=$'\n'
-for line in $( jq -r '.files[] | (.id | tostring) + ":" + .name' <<< $completedDownloadsJson)
+for line in $( jq -r '.files[] | (.id | tostring) + ":" + .name + ":" + .file_type' <<< $completedDownloadsJson)
 do
 	dlId=$(cut -d':' -f1 <<< $line)
 	dlName=$(cut -d':' -f2 <<< $line)
+	dlType=$(cut -d':' -f3 <<< $line)
 
 	# Checking if file is one we need
 	weNeedThisFile=0
 	[[ -f $BLACKHOLE/${dlId}.transfer ]] && weNeedThisFile=1
 
-	[[ $weNeedThisFile == 1 ]] && retrieveList+=("$dlId")
+	[[ $weNeedThisFile == 1 ]] && retrieveList+=("$dlId:$dlType")
 
 	color=$YELLOW
 	[[ $weNeedThisFile == 1 ]] && color=$GREEN 
@@ -67,10 +68,17 @@ echo
 if [[ -n ${retrieveList[0]} ]]; then
 	print_info "Downloading watched transfers ..."
 
-	for id in ${retrieveList[@]}
+	for file in ${retrieveList[@]}
 	do
-		echo
-		aria2c "http://api.put.io/v2/files/426556096/download?oauth_token=${PUTIO_TOKEN}"
+		dlId=$(cut -d':' -f1 <<< $file)
+		dlType=$(cut -d':' -f2 <<< $file)
+
+		if [[ $dlType == FOLDER ]]; then
+			print_info "    - $dlId is a folder, zip needed"
+		else
+			print_info "    - Downloading $dlId"
+			aria2c "http://api.put.io/v2/files/${dlId}/download?oauth_token=${PUTIO_TOKEN}"
+		fi
 	done
 else
 	print_info "No watched transfer is finished, nothing to download"
