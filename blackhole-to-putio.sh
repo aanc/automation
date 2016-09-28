@@ -75,6 +75,21 @@ if [[ -n ${retrieveList[0]} ]]; then
 
 		if [[ $dlType == FOLDER ]]; then
 			print_info "    - $dlId is a folder, zip needed"
+			zipResult=$(curl -XPOST --silent --data-urlencode "file_ids=$dlId" "https://api.put.io/v2/zips/create?oauth_token=${PUTIO_TOKEN}")
+
+			zipStatus=$(jq -r '.status' <<< $zipResult)
+			zipId=$(jq -r '.zip_id' <<< $zipResult)
+			if [[ $zipStatus == OK ]]; then
+				print_info "         -> Zip creation triggered, id $zipId"
+				
+				echo "ZIP_ID=$zipId" > ${dlId}.dlzip
+				echo "DESTINATION_FOLDER=$BLACKHOLE" >> ${dlId}.dlzip
+				echo "PUTIO_TOKEN=$PUTIO_TOKEN" >> ${dlId}.dlzip
+
+				mv $BLACKHOLE/${dlId}.transfer $BLACKHOLE/${dlId}.zipped
+			else
+				print_error "        -> Zip creation failed on put.io"
+			fi
 		else
 			print_info "    - Triggering download job for $dlId"
 			echo "URL=http://api.put.io/v2/files/${dlId}/download?oauth_token=${PUTIO_TOKEN}" > ${dlId}.dl
