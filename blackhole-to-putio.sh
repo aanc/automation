@@ -40,47 +40,33 @@ do
 
 done
 
-print_info "Retrieving completed downloads list ..."
-completedDownloadsJson=$(curl --silent "https://api.put.io/v2/files/list?oauth_token=${PUTIO_TOKEN}&parent_id=${FOLDER_ID}")
+print_info "Retrieving completed transfers list ..."
+completedTransfersList=$(curl --silent "https://api.put.io/v2/transfers/list?oauth_token=${PUTIO_TOKEN}")
 
 declare -a retrieveList
 oIFS=$IFS
 IFS=$'\n'
-for line in $( jq -r '.files[] | (.id | tostring) + ":" + .name + ":" + .file_type' <<< $completedDownloadsJson)
+for line in $(jq -r '.transfers[] | select(.status == "SEEDING" or .status == "COMPLETED")  | (.id | tostring) + ":" + .name + ":" + (.file_id | tostring)' <<< $completedTransfersList)
 do
 	dlId=$(cut -d':' -f1 <<< $line)
 	dlName=$(cut -d':' -f2 <<< $line)
-	dlType=$(cut -d':' -f3 <<< $line)
+	fileId=$(cut -d':' -f3 <<< $line)
 
-	# Checking if file is one we need
-	weNeedThisFile=0
-	[[ -f $BLACKHOLE/${dlId}.transfer ]] && weNeedThisFile=1
+	if [[ -f  $BLACKHOLE/${dlId}.transfer ]]; then
+		print_info "    - ${BOLD}$dlId${END} : ${GREEN}$dlName${END}"
 
-	[[ $weNeedThisFile == 1 ]] && retrieveList+=("$dlId:$dlType")
+		# Get file type (folder or file)
+		dlType=$(curl --silent "https://api.put.io/v2/files/${fileId}?oauth_token=${PUTIO_TOKEN}" | jq -r .file.file_type)
 
-	color=$YELLOW
-	[[ $weNeedThisFile == 1 ]] && color=$GREEN 
-	print_info "    - ${BOLD}$dlId${END} : ${color}$dlName${END}"
-done
-IFS=$oIFS
-
-echo
-if [[ -n ${retrieveList[0]} ]]; then
-	print_info "Downloading watched transfers ..."
-
-	for file in ${retrieveList[@]}
-	do
-		dlId=$(cut -d':' -f1 <<< $file)
-		dlType=$(cut -d':' -f2 <<< $file)
-
+		# Building triggers files for jenkins jobs
 		if [[ $dlType == FOLDER ]]; then
-			print_info "    - $dlId is a folder, zip needed"
-			zipResult=$(curl -XPOST --silent --data-urlencode "file_ids=$dlId" "https://api.put.io/v2/zips/create?oauth_token=${PUTIO_TOKEN}")
+			print_info "        -> $dlId is a folder, zip needed"
+			zipResult=$(curl -XPOST --silent --data-urlencode "file_ids=$fileId" "https://api.put.io/v2/zips/create?oauth_token=${PUTIO_TOKEN}")
 
 			zipStatus=$(jq -r '.status' <<< $zipResult)
 			zipId=$(jq -r '.zip_id' <<< $zipResult)
 			if [[ $zipStatus == OK ]]; then
-				print_info "         -> Zip creation triggered, id $zipId"
+				print_info "        -> Zip creation triggered, id $zipId"
 				
 				echo "ZIP_ID=$zipId" > ${dlId}.dlzip
 				echo "DESTINATION_FOLDER=$BLACKHOLE" >> ${dlId}.dlzip
@@ -96,7 +82,10 @@ if [[ -n ${retrieveList[0]} ]]; then
 			echo "DESTINATION_FOLDER=$BLACKHOLE" >> ${dlId}.dl
 			mv $BLACKHOLE/${dlId}.transfer $BLACKHOLE/${dlId}.downloaded
 		fi
-	done
-else
-	print_info "No watched transfer is finished, nothing to download"
-fi
+	else
+		print_info "    - ${BOLD}$dlId${END} : ${YELLOW}$dlName${END}"
+	fi
+
+done
+IFS=$oIFS
+
