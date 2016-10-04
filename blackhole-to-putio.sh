@@ -78,7 +78,7 @@ do
 			fi
 		else
 			print_info "    - Triggering download job for $dlId"
-			echo "URL=http://api.put.io/v2/files/${dlId}/download?oauth_token=${PUTIO_TOKEN}" > ${dlId}.dl
+			echo "URL=http://api.put.io/v2/files/${fileId}/download?oauth_token=${PUTIO_TOKEN}" > ${dlId}.dl
 			echo "DESTINATION_FOLDER=$BLACKHOLE" >> ${dlId}.dl
 			mv $BLACKHOLE/${dlId}.transfer $BLACKHOLE/${dlId}.downloaded
 		fi
