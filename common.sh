@@ -30,6 +30,12 @@ print_success() {
 	return 0
 }
 
+print_warn() {
+	local msg=$1
+	echo -e "${YELLOW} [WARN] $msg${END}"
+	return 0
+}
+
 # External notification tools
 send_slack_notification() {
 	local msg="$1"
