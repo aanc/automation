@@ -8,7 +8,8 @@ source common.sh
 [[ -z $DOWNLOADED_FOLDER ]] && print_error "DOWNLOADED_FOLDER is not set" && exit 1
 [[ -z $DL_JOB_NAME= ]] && print_error "DL_JOB_NAME is not set" && exit 1
 [[ -z $DL_JOB_TOKEN= ]] && print_error "DL_JOB_TOKEN is not set" && exit 1
-
+[[ -z $JENKINS_PASSWORD ]] && print_error "JENKINS_PASSWORD is not set" && exit 1
+[[ -z $JENKINS_USER ]] && print_error "JENKINS_USER is not set" && exit 1
 
 print_info "Retrieving completed transfers list ..."
 completedTransfersList=$(curl --silent "https://api.put.io/v2/transfers/list?oauth_token=${PUTIO_TOKEN}")
@@ -31,31 +32,43 @@ do
 		# Get file type (folder or file)
 		dlType=$(curl --silent "https://api.put.io/v2/files/${fileId}?oauth_token=${PUTIO_TOKEN}" | jq -r .file.file_type)
 
-		# Building triggers files for jenkins jobs
 		if [[ $dlType == FOLDER ]]; then
 			print_info "        -> $dlId is a folder, zip needed"
 			zipResult=$(curl -XPOST --silent --data-urlencode "file_ids=$fileId" "https://api.put.io/v2/zips/create?oauth_token=${PUTIO_TOKEN}")
 
 			zipStatus=$(jq -r '.status' <<< $zipResult)
 			zipId=$(jq -r '.zip_id' <<< $zipResult)
-			if [[ $zipStatus == OK ]]; then
-				print_info "        -> This job does not handle zip file atm. Skipping".
-				continue
 
+			if [[ $zipStatus == OK ]]; then
 				print_info "        -> Zip creation triggered, id $zipId"
 				
-				echo "ZIP_ID=$zipId" > ${dlId}.dlzip
-				echo "DESTINATION_FOLDER=$BLACKHOLE" >> ${dlId}.dlzip
-				echo "PUTIO_TOKEN=$PUTIO_TOKEN" >> ${dlId}.dlzip
+				zip=true	
+				url=
+				while [[ -z $url || $url == false ]]; do
+					url="$(curl -XGET --silent "https://api.put.io/v2/zips/${zipId}?oauth_token=${PUTIO_TOKEN}" | jq -r ".url")"
+					print_info "        -> Waiting for zip creation on put.io ..."
+					sleep 10
+				done
+
+				print_info "        -> Zip creation complete, url is $url"
 
 			else
 				print_error "        -> Zip creation failed on put.io"
+				continue
 			fi
 		else
-			URL="http://api.put.io/v2/files/${fileId}/download?oauth_token=${PUTIO_TOKEN}"
-			print_info "        -> Triggering download job for $dlId ($URL)"
-			curl -L "${JENKINS_URL}/job/${DL_JOB_NAME}/buildWithParameters?token=${DL_JOB_TOKEN}&ZIP=false&FILE_URL=${URL}" -u trigger:ttrriiggeerr
+			url="http://api.put.io/v2/files/${fileId}/download?oauth_token=${PUTIO_TOKEN}"
+			zip=false
+		fi
+		
+		print_info "        -> Triggering download job from $url"
+		url=$(sed -e "s/&/%26/g" <<< $url)
+		curlStatus=$(curl -L -w "%{http_code}" "${JENKINS_URL}/job/${DL_JOB_NAME}/buildWithParameters?token=${DL_JOB_TOKEN}&ZIP=${zip}&FILE_URL=${url}" -u ${JENKINS_USER}:${JENKINS_PASSWORD})
+
+		if [[ $curlStatus == 201 ]]; then
 			mv $torrent $DOWNLOADED_FOLDER/$(basename $torrent).$(date +"%Y-%m-%d_%H-%M").downloaded
+		else
+			print_error "        -> Something went wrong during job triggering (HTTP $curlStatus)"
 		fi
 	else
 		print_info "    - ${BOLD}$dlId${END} : ${YELLOW}$dlName${END}"
