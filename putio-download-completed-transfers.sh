@@ -63,7 +63,7 @@ do
 		
 		print_info "        -> Triggering download job from $url"
 		url=$(sed -e "s/&/%26/g" <<< $url)
-		curlStatus=$(curl -L -w "%{http_code}" "${JENKINS_URL}/job/${DL_JOB_NAME}/buildWithParameters?token=${DL_JOB_TOKEN}&ZIP=${zip}&FILE_URL=${url}" -u ${JENKINS_USER}:${JENKINS_PASSWORD})
+		curlStatus=$(curl -k -L -w "%{http_code}" "${JENKINS_URL}/job/${DL_JOB_NAME}/buildWithParameters?token=${DL_JOB_TOKEN}&ZIP=${zip}&FILE_URL=${url}" -u ${JENKINS_USER}:${JENKINS_PASSWORD})
 
 		if [[ $curlStatus == 201 ]]; then
 			mv $torrent $DOWNLOADED_FOLDER/$(basename $torrent).$(date +"%Y-%m-%d_%H-%M").downloaded
